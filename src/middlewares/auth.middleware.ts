@@ -1,3 +1,4 @@
+import type {} from '../types/express';
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';

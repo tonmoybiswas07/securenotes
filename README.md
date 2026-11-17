@@ -1,7 +1,12 @@
 # Secure Notes
 
 Express 5 + TypeScript REST API using MongoDB/Mongoose, bcrypt password hashing,
-JWT authentication, and a small plain HTML/JS frontend. No frontend template.
+JWT authentication. The plain HTML/JS frontend lives in a separate repository:
+https://github.com/tonmoybiswas07/securenotes-frontend (no frontend template).
+
+Live API: https://securenotes-api-rho.vercel.app
+
+Live frontend: https://securenotes-frontend-liard.vercel.app
 
 ## Run locally
 
@@ -29,8 +34,9 @@ set. It has no credentials and is intended for local development only.
 npm run dev
 ```
 
-Open **http://localhost:5001** for the frontend. The frontend keeps JWTs in memory;
-refreshing the page signs out. Access tokens expire after one hour.
+The API runs at **http://localhost:5001**. Its root returns API metadata.
+Run the separate frontend at **http://localhost:5173** using its README.
+The frontend keeps JWTs in memory; refreshing signs out. Tokens expire after one hour.
 
 To create the first admin, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`, then:
 
@@ -139,4 +145,5 @@ review existing indexes separately: this application does not drop old indexes.
 
 ## Hosting
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the Render + Atlas deployment steps.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for separate Vercel backend/frontend deployment.
+See [SUBMISSION.md](SUBMISSION.md) for repository and live links.

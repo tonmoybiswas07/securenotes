@@ -191,9 +191,14 @@ test('user deletion atomically removes content and invalidates existing bearer t
   assert.equal((await request('/users', 'GET', undefined, admin.token)).status, 403);
 });
 
-test('serves the frontend and returns safe errors for malformed requests', async () => {
+test('serves API metadata, health, CORS and safe malformed-request errors', async () => {
   assert.equal((await fetch(base)).status, 200);
-  assert.equal((await fetch(`${base}/app.js`)).status, 200);
+  assert.equal((await (await fetch(base)).json()).name, 'Secure Notes API');
+  assert.equal((await fetch(`${base}/app.js`)).status, 404);
+  assert.equal((await request('/health')).data.status, 'ok');
+  const preflight = await fetch(`${base}/api/notes`, { method: 'OPTIONS', headers: { Origin: 'http://localhost:5173', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), 'http://localhost:5173');
   assert.equal((await request('/missing')).status, 404);
   const malformed = await fetch(`${base}/api/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{broken',

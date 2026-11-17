@@ -7,3 +7,12 @@ coverage/
 local-guides/
 *.pdf
 .DS_Store
+
+# Separate frontend Git repository and hosting metadata
+/frontend/
+.vercel/
+.vercel
+.env.*
+!.env.example
+
+.vscode/

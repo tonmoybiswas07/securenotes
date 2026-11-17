@@ -1,42 +1,94 @@
-# Deployment: Render + MongoDB Atlas
+# Deployment: separate frontend and backend
 
+This submission uses two GitHub repositories and two Vercel projects. MongoDB
+Atlas stores all users, notes, and posts.
 
-এটি deployment plan; service এখনো publish করা হয়নি। Backend ও basic frontend একই Node service-এ থাকবে। নিচের dashboard ধাপগুলো service তৈরি করার সময় অনুসরণ করবে।
+| Item | URL |
+| --- | --- |
+| Frontend source | https://github.com/tonmoybiswas07/securenotes-frontend |
+| Backend source | https://github.com/tonmoybiswas07/securenotes |
+| Frontend live | https://securenotes-frontend-liard.vercel.app |
+| Backend live | https://securenotes-api-rho.vercel.app |
+| Database health | https://securenotes-api-rho.vercel.app/api/health |
 
-১) GitHub-এ code push শেষ করো। Render-এ login করে New → Web Service থেকে repo connect করো। Runtime Node এবং branch main বেছে নাও। Static Site বেছে নেবে না; এই app-এর Express server লাগে।
+## Backend project
 
-২) Build command: npm ci --include=dev && npm run build
-Start command: npm start
-Health check path: /api/health
-Node version: 24 (NODE_VERSION environment variable দিয়ে pin করা যায়)। TypeScript build-এর জন্য devDependencies দরকার।
+Import the backend GitHub repo into Vercel with the Express framework. This repo's
+`vercel.json` supplies the build settings. `src/app.ts` exports the Express app;
+`src/server.ts` is the local persistent-server entry point.
 
-৩) Hosting environment variables দাও:
-MONGODB_URI = তোমার Atlas URI (বাস্তব value শুধু Render-এ)
-JWT_SECRET = নতুন random secret, অন্তত 32 characters
-CLIENT_ORIGIN = service-এর আসল https://...onrender.com URL
-NODE_ENV = production
-NODE_VERSION = 24
-PORT নিজে 5001 করে set করবে না; platform-এর দেওয়া PORT ব্যবহার করবে।
+- Install: `npm ci --include=dev`
+- Build: `npm run build`
+- Node: 24.x
+- `MONGODB_URI`: actual Atlas URI, configured as a production secret
+- `JWT_SECRET`: separate production signing secret, at least 32 characters
+- `CLIENT_ORIGIN`: `https://securenotes-frontend-liard.vercel.app`
+- `TRUST_PROXY_HOPS`: `1` for this deployment's proxy boundary; `0` locally
 
-৪) Render service-এর Connect → Outbound থেকে outbound IP ranges নাও। Atlas Network Access-এ সেই CIDR ranges allowlist করো। Atlas URI-তে database user-এর credentials দেবে, Atlas website login credentials নয়। Password-এর special characters URL-encode করতে হবে।
+The database connection and index initialization are shared within a warm function
+instance. API handlers wait for initialization, including after cold starts.
+`/api/health` checks that initialization succeeded. Requests still depend on Atlas
+availability. Atlas Network Access must permit the deployment's outbound traffic.
+Do not commit actual environment values or `.vercel/` metadata.
 
-৫) Deploy করো। Logs-এ database connected ও API listening দেখবে। Live /api/health-এ status=ok, homepage, register/login, note CRUD, admin views ও lookup পরীক্ষা করো। URL জানা গেলে CLIENT_ORIGIN update করে restart/deploy করো। Same-origin frontend-এর fetch path বদলাতে হবে না।
+Vercel controls HTTP invocation; no public port needs configuring. If moving to a
+persistent host such as Render, use `npm start`; the local server reads `PORT`.
 
-৬) প্রথম admin local seed:admin দিয়েই বানানো যায়, যদি local .env একই Atlas database-এর দিকে point করে। Set ADMIN_EMAIL ও ADMIN_PASSWORD, তারপর npm run seed:admin। Existing account seed overwrite করবে না। Real admin password repository-তে রাখবে না।
+## Frontend project
 
-৭) Reverse proxy-এর পেছনে client-IP handling যাচাই করো। বর্তমান app trust proxy configure করে না; shared proxy IP rate-limit-এ users-কে একসঙ্গে limit করতে পারে। Platform topology নিশ্চিত করে সঠিক trust policy set ও test করবে; অন্ধভাবে trust proxy=true দেবে না। In-memory rate limits multi-instance-এ shared নয়।
+Import the independent frontend repository as a second Vercel project. Its own
+`vercel.json` configures `npm run build` and output directory `dist`.
 
-৮) Free Render service 15 মিনিট idle থাকলে sleep করতে পারে; পরের request-এ startup delay হয়। Interview demo-এর আগে URL খুলে ready রাখবে। এটি demo option; production hosting requirements আলাদা করে বিচার করবে।
+Set `PUBLIC_API_BASE_URL=https://securenotes-api-rho.vercel.app/api` in production.
+The build writes this public URL to `config.js`. Database credentials and signing
+secrets are never needed by the frontend. If URLs change, update this value and
+the backend's `CLIENT_ORIGIN`, then redeploy both affected projects.
 
+Production environment changes apply on the next deployment. Both projects are
+connected to their own GitHub repositories for later deployments from `main`.
 
-## Official references
+## Run locally for the interview
 
+Backend terminal:
 
-তথ্য যাচাই: ১৭ নভেম্বর ২০২৬। Dashboard labels ও plans বদলাতে পারে।
-Render Express deployment: https://render.com/docs/deploy-node-express-app
-Render Web Services: https://render.com/docs/web-services
-Render Outbound IPs: https://render.com/docs/outbound-ip-addresses
-Render Free services: https://render.com/docs/free
-Render Node versions: https://render.com/docs/node-version
-Atlas IP Access List: https://www.mongodb.com/docs/atlas/security/ip-access-list/
+```sh
+npm install
+# Set .env with your own Atlas URI and JWT_SECRET; CLIENT_ORIGIN=http://localhost:5173
+npm run dev
+```
 
+Frontend terminal (its own checkout):
+
+```sh
+cp .env.example .env
+npm run dev
+```
+
+The backend is at http://localhost:5001 and the frontend at http://localhost:5173.
+In the original working directory, the separate frontend checkout is `frontend/`;
+that folder is ignored by the parent backend repository.
+
+## Admin setup
+
+Run `npm run seed:admin` locally with `ADMIN_EMAIL` and `ADMIN_PASSWORD` set in the
+backend `.env` and the same Atlas database URI as production. The script creates a
+new account and refuses to overwrite an existing account. Never publish admin
+credentials. Browser refresh signs out because JWTs live only in memory.
+
+## Verification and limits
+
+Integration tests use a temporary replica set, not Atlas. Public production HTTP
+checks verify frontend assets, API configuration, health, and public posts. A
+short-lived deployment-check account verifies live registration, authenticated
+note CRUD, role denial, and `$lookup`; its account and content are removed afterward.
+Browser click-through QA has not been performed.
+
+Rate limits currently use in-process memory, so limits are not shared across
+serverless instances and reset on restarts. A durable rate-limit store is a future
+production improvement. Password changes do not revoke already-issued tokens;
+they expire within one hour. See the README for index and pagination tradeoffs.
+
+## References
+
+- https://vercel.com/docs/frameworks/backend/express
+- https://www.mongodb.com/docs/atlas/security/ip-access-list/
