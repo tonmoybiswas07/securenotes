@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+coverage/
+
+# Local interview documents: never publish to GitHub
+local-guides/
+*.pdf
+.DS_Store
